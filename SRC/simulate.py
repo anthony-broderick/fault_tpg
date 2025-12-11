@@ -24,97 +24,90 @@ def invert_value(val):
         return D
     return X
 
-def evaluate_xor(gate):
-    values = []
+def get_initial_output(gate):
+	values = []
+	has_x = False
+	control = ONE if gate.c == '1' else ZERO
+	gate_type = gate.gate_type
 
-    for i in gate.inputs:
-        inp_val = globals.wire_values[i]
-        # can't compute xor with don't care
-        if inp_val == X:
-            return X
+	for i in gate.inputs:
+		inp_val = globals.wire_values[i]
+		# can't compute xor/xnor with don't care
+		if gate_type in ["xor", "xnor"] and inp_val == X:
+			return X
+		# check for controlling value
+		if gate_type not in ["xor", "xnor"]:
+			if inp_val == control:
+				return control
 
-        if inp_val == D:
-            values += ["1", "0"]
-        elif inp_val == DB:
-            values += ["0", "1"]
-        elif inp_val == ZERO:
-            values += ["0", "0"]
-        else:
-            values += ["1", "1"]
+		if inp_val == X:
+			has_x = True
+		# assign good and fault inputs
+		elif inp_val == D:
+			values += ["1", "0"]
+		elif inp_val == DB:
+			values += ["0", "1"]
+		elif inp_val == ZERO:
+			values += ["0", "0"]
+		else:
+			values += ["1", "1"]
 
-    good_output = 0
-    fault_output = 0
-    for i in range(len(values)):
-        if i % 2 == 0:
-            good_output ^= int(values[i])
-        else:
-            fault_output ^= int(values[i])
-    
-    if good_output == 0 and good_output == fault_output:
-        return ZERO
-    elif good_output == 1 and good_output == fault_output:
-        return ONE
-    elif good_output == 1 and fault_output == 0:
-        return D
-    elif good_output == 0 and fault_output == 1:
-        return DB
-    else:
-        print("FAILED TO FIND OUTPUT FOR XOR")
-        return ZERO
+	# don't cares make it so output is unknown
+	if gate_type not in ["xor", "xnor"]:
+		if has_x == True:
+			return X
+
+	good_output = 0
+	fault_output = 0
+	if gate_type in ["and", "nand"]:
+		good_output = 1
+		fault_output = 1
+	# make gate computation for good and fault values
+	for i in range(len(values)):
+		if i % 2 == 0:
+			match gate_type:
+				case "and" | "nand":
+					good_output *= int(values[i])
+				case "or" | "nor":
+					good_output |= int(values[i])
+				case "xor" | "xnor":
+					good_output ^= int(values[i])
+		else:
+			match gate_type:
+				case "and" | "nand":
+					fault_output *= int(values[i])
+				case "or" | "nor":
+					fault_output |= int(values[i])
+				case "xor" | "xnor":
+					fault_output ^= int(values[i])
+
+	# set output
+	if good_output == 0 and fault_output == 0:
+		return ZERO
+	elif good_output == 1 and fault_output == 1:
+		return ONE
+	elif good_output == 1 and fault_output == 0:
+		return D
+	elif good_output == 0 and fault_output == 1:
+		return DB
+	else:
+		raise ValueError("Unknown output combination")
 
 def evaluate_gate(gate):
-	# Returns new 5-valued logic for gate.output[0] based on gate.inputs
-	in_vals = [globals.wire_values.get(i, X) for i in gate.inputs]
+    # returns new 5-valued logic for gate.output[0] based on gate.inputs
+    in_vals = [globals.wire_values.get(i, X) for i in gate.inputs]
 
-	# NOT gate
-	if gate.gate_type == 'not':
-		vin = in_vals[0]
-		if vin in (ZERO, ONE):
-			return ONE if vin == ZERO else ZERO
-		if vin == D:
-			return DB if gate.inv == 0 else invert_value(DB)
-		if vin == DB:
-			return D if gate.inv == 0 else invert_value(D)
-		return X
+    # NOT gate
+    if gate.gate_type == 'not':
+        return invert_value(in_vals[0])
+    
+    out = get_initial_output(gate)
 
-	if gate.gate_type == 'xor':
-		return evaluate_xor(gate)
-	if gate.gate_type == 'xnor':
-		return invert_value(evaluate_xor(gate))
+    # account for gate inversion
+    if gate.inv == 1:
+        out = invert_value(out)
 
-	# For multi-input gates (AND/OR-like with control value gate.c)
-	control = str(gate.c)
-	non_control = '1' if gate.c == 0 else '0'
-
-	# If any input equals control -> output is control
-	if control in in_vals:
-		out = control
-	else:
-		# no control value present
-		if X in in_vals:
-			out = X
-		else:
-			out = non_control
-
-	# Handle D / D' propagation
-	has_d = D in in_vals
-	has_db = DB in in_vals
-	if has_d or has_db:
-		if control in in_vals:
-			out = control
-		else:
-			if has_d and not has_db:
-				out = D
-			elif has_db and not has_d:
-				out = DB
-			else:
-				out = X
-
-	# Account for gate inversion
-	if getattr(gate, 'inv', 0) == 1:
-		out = invert_value(out)
-
-	return out
+    return out
 
 def get_test_vector():
 	# collect test vector
@@ -192,16 +185,24 @@ def simulate_no_faults():
 		changed = False
 		iteration += 1
 		for gate in globals.gates:
-			# gate.output may be a list (fanout) or a single value; normalize to list
-			outputs = gate.output if isinstance(gate.output, list) else [gate.output]
-			# evaluate gate once; only update outputs that do not have injected faults
-			new = evaluate_gate(gate)
-			# assign new value to each output wire and mark changed if any updated
-			for out in outputs:
-				old = globals.wire_values.get(out, 'X')
-				if new != old:
-					globals.wire_values[out] = new
-					changed = True
+			if gate.gate_type == 'fanout':
+				for out in gate.output:
+					old = globals.wire_values.get(out, X)
+					new = globals.wire_values[gate.inputs[0]]
+					if new != old:
+						globals.wire_values[out] = new
+						changed = True
+			else:
+				# gate.output may be a list (fanout) or a single value; normalize to list
+				outputs = gate.output if isinstance(gate.output, list) else [gate.output]
+				# evaluate gate once; only update outputs that do not have injected faults
+				new = evaluate_gate(gate)
+				# assign new value to each output wire and mark changed if any updated
+				for out in outputs:
+					old = globals.wire_values.get(out, 'X')
+					if new != old:
+						globals.wire_values[out] = new
+						changed = True
 	print("")
 	for po in globals.primary_outputs:
 		val = globals.wire_values.get(po, 'X')
@@ -230,19 +231,30 @@ def simulate(fault_line, fault_value):
 		changed = False
 		iteration += 1
 		for gate in globals.gates:
-			# gate.output may be a list (fanout) or a single value; normalize to list
-			outputs = gate.output if isinstance(gate.output, list) else [gate.output]
-			# evaluate gate once; only update outputs that do not have injected faults
-			new = evaluate_gate(gate)
-			# assign new value to each output wire and mark changed if any updated
-			for out in outputs:
-				# don't overwrite wires with explicitly injected faults
-				if out == fault_line:
-					continue
-				old = globals.wire_values.get(out, 'X')
-				if new != old:
-					globals.wire_values[out] = new
-					changed = True
+			if gate.gate_type == 'fanout':
+				for out in gate.output:
+					# handle target fault on fanout branch
+					if out == fault_line:
+						continue
+					old = globals.wire_values.get(out, X)
+					new = globals.wire_values[gate.inputs[0]]
+					if new != old:
+						globals.wire_values[out] = new
+						changed = True
+			else:
+				# gate.output may be a list (fanout) or a single value; normalize to list
+				outputs = gate.output if isinstance(gate.output, list) else [gate.output]
+				# evaluate gate once; only update outputs that do not have injected faults
+				new = evaluate_gate(gate)
+				# assign new value to each output wire and mark changed if any updated
+				for out in outputs:
+					# don't overwrite wires with explicitly injected faults
+					if out == fault_line:
+						continue
+					old = globals.wire_values.get(out, 'X')
+					if new != old:
+						globals.wire_values[out] = new
+						changed = True
 	# collect results for table
 	add_fault_result(fault_line, fault_value)
 

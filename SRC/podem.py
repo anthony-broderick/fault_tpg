@@ -160,16 +160,26 @@ def Imply(j,vj): # first call is a PI line (j) and needed value (vj)
                     globals.wire_values[gate.output[0]] = new
                     changed = True
 
-def evaluate_xor(gate):
+def get_initial_output(gate):
     values = []
+    has_x = False
+    control = ONE if gate.c == '1' else ZERO
+    gate_type = gate.gate_type
 
     for i in gate.inputs:
         inp_val = globals.wire_values[i]
-        # can't compute xor with don't care
-        if inp_val == X:
+        # can't compute xor/xnor with don't care
+        if gate_type in ["xor", "xnor"] and inp_val == X:
             return X
+        # check for controlling value
+        if gate_type not in ["xor", "xnor"]:
+            if inp_val == control:
+                return control
 
-        if inp_val == D:
+        if inp_val == X:
+            has_x = True
+        # assign good and fault inputs
+        elif inp_val == D:
             values += ["1", "0"]
         elif inp_val == DB:
             values += ["0", "1"]
@@ -178,25 +188,46 @@ def evaluate_xor(gate):
         else:
             values += ["1", "1"]
 
+    # don't cares make it so output is unknown
+    if gate_type not in ["xor", "xnor"]:
+        if has_x == True:
+            return X
+
     good_output = 0
     fault_output = 0
+    if gate_type in ["and", "nand"]:
+        good_output = 1
+        fault_output = 1
+    # make gate computation for good and fault values
     for i in range(len(values)):
         if i % 2 == 0:
-            good_output ^= int(values[i])
+            match gate_type:
+                case "and" | "nand":
+                    good_output *= int(values[i])
+                case "or" | "nor":
+                    good_output |= int(values[i])
+                case "xor" | "xnor":
+                    good_output ^= int(values[i])
         else:
-            fault_output ^= int(values[i])
-    
-    if good_output == 0 and good_output == fault_output:
+            match gate_type:
+                case "and" | "nand":
+                    fault_output *= int(values[i])
+                case "or" | "nor":
+                    fault_output |= int(values[i])
+                case "xor" | "xnor":
+                    fault_output ^= int(values[i])
+
+    # set output
+    if good_output == 0 and fault_output == 0:
         return ZERO
-    elif good_output == 1 and good_output == fault_output:
+    elif good_output == 1 and fault_output == 1:
         return ONE
     elif good_output == 1 and fault_output == 0:
         return D
     elif good_output == 0 and fault_output == 1:
         return DB
     else:
-        print("FAILED TO FIND OUTPUT FOR XOR")
-        return ZERO
+        raise ValueError("Unknown output combination")
 
 def evaluate_gate(gate):
     # returns new 5-valued logic for gate.output[0] based on gate.inputs
@@ -206,32 +237,7 @@ def evaluate_gate(gate):
     if gate.gate_type == 'not':
         return invert_value(in_vals[0])
     
-    if gate.gate_type == 'xor':
-        return evaluate_xor(gate)
-    if gate.gate_type == 'xnor':
-        return invert_value(evaluate_xor(gate))
-
-    control = str(gate.c)
-    control = ONE if control == '1' else ZERO
-
-    if control in in_vals:
-        out = control
-    elif X not in in_vals:
-        has_d = D in in_vals
-        has_db = DB in in_vals
-        if has_d and not has_db:
-            out = D
-        elif has_db and not has_d:
-            out = DB
-        elif has_d and has_db:
-            # conflict
-            out = X
-        else:
-            control_complement = invert_value(control)
-            out = control_complement
-    else:
-        out = X
-
+    out = get_initial_output(gate)
 
     # account for gate inversion
     if gate.inv == 1:
