@@ -33,7 +33,7 @@ def PODEM():
     k, vk = Objective() 
     if k is None:
         return 'FAILURE'
-
+    
     # using input from Objective, backtrace to PI (does not change any values)
     j, vj = Backtrace(k, vk)
     if j is None:
@@ -160,6 +160,44 @@ def Imply(j,vj): # first call is a PI line (j) and needed value (vj)
                     globals.wire_values[gate.output[0]] = new
                     changed = True
 
+def evaluate_xor(gate):
+    values = []
+
+    for i in gate.inputs:
+        inp_val = globals.wire_values[i]
+        # can't compute xor with don't care
+        if inp_val == X:
+            return X
+
+        if inp_val == D:
+            values += ["1", "0"]
+        elif inp_val == DB:
+            values += ["0", "1"]
+        elif inp_val == ZERO:
+            values += ["0", "0"]
+        else:
+            values += ["1", "1"]
+
+    good_output = 0
+    fault_output = 0
+    for i in range(len(values)):
+        if i % 2 == 0:
+            good_output ^= int(values[i])
+        else:
+            fault_output ^= int(values[i])
+    
+    if good_output == 0 and good_output == fault_output:
+        return ZERO
+    elif good_output == 1 and good_output == fault_output:
+        return ONE
+    elif good_output == 1 and fault_output == 0:
+        return D
+    elif good_output == 0 and fault_output == 1:
+        return DB
+    else:
+        print("FAILED TO FIND OUTPUT FOR XOR")
+        return ZERO
+
 def evaluate_gate(gate):
     # returns new 5-valued logic for gate.output[0] based on gate.inputs
     in_vals = [globals.wire_values.get(i, X) for i in gate.inputs]
@@ -167,6 +205,11 @@ def evaluate_gate(gate):
     # NOT gate
     if gate.gate_type == 'not':
         return invert_value(in_vals[0])
+    
+    if gate.gate_type == 'xor':
+        return evaluate_xor(gate)
+    if gate.gate_type == 'xnor':
+        return invert_value(evaluate_xor(gate))
 
     control = str(gate.c)
     control = ONE if control == '1' else ZERO

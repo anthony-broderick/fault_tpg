@@ -24,54 +24,97 @@ def invert_value(val):
         return D
     return X
 
-def evaluate_gate(gate):
-    # Returns new 5-valued logic for gate.output[0] based on gate.inputs
-    in_vals = [globals.wire_values.get(i, X) for i in gate.inputs]
+def evaluate_xor(gate):
+    values = []
 
-    # NOT gate
-    if gate.gate_type == 'not':
-        vin = in_vals[0]
-        if vin in (ZERO, ONE):
-            return ONE if vin == ZERO else ZERO
-        if vin == D:
-            return DB if gate.inv == 0 else invert_value(DB)
-        if vin == DB:
-            return D if gate.inv == 0 else invert_value(D)
-        return X
+    for i in gate.inputs:
+        inp_val = globals.wire_values[i]
+        # can't compute xor with don't care
+        if inp_val == X:
+            return X
 
-    # For multi-input gates (AND/OR-like with control value gate.c)
-    control = str(gate.c)
-    non_control = '1' if gate.c == 0 else '0'
+        if inp_val == D:
+            values += ["1", "0"]
+        elif inp_val == DB:
+            values += ["0", "1"]
+        elif inp_val == ZERO:
+            values += ["0", "0"]
+        else:
+            values += ["1", "1"]
 
-    # If any input equals control -> output is control
-    if control in in_vals:
-        out = control
+    good_output = 0
+    fault_output = 0
+    for i in range(len(values)):
+        if i % 2 == 0:
+            good_output ^= int(values[i])
+        else:
+            fault_output ^= int(values[i])
+    
+    if good_output == 0 and good_output == fault_output:
+        return ZERO
+    elif good_output == 1 and good_output == fault_output:
+        return ONE
+    elif good_output == 1 and fault_output == 0:
+        return D
+    elif good_output == 0 and fault_output == 1:
+        return DB
     else:
-        # no control value present
-        if X in in_vals:
-            out = X
-        else:
-            out = non_control
+        print("FAILED TO FIND OUTPUT FOR XOR")
+        return ZERO
 
-    # Handle D / D' propagation
-    has_d = D in in_vals
-    has_db = DB in in_vals
-    if has_d or has_db:
-        if control in in_vals:
-            out = control
-        else:
-            if has_d and not has_db:
-                out = D
-            elif has_db and not has_d:
-                out = DB
-            else:
-                out = X
+def evaluate_gate(gate):
+	# Returns new 5-valued logic for gate.output[0] based on gate.inputs
+	in_vals = [globals.wire_values.get(i, X) for i in gate.inputs]
 
-    # Account for gate inversion
-    if getattr(gate, 'inv', 0) == 1:
-        out = invert_value(out)
+	# NOT gate
+	if gate.gate_type == 'not':
+		vin = in_vals[0]
+		if vin in (ZERO, ONE):
+			return ONE if vin == ZERO else ZERO
+		if vin == D:
+			return DB if gate.inv == 0 else invert_value(DB)
+		if vin == DB:
+			return D if gate.inv == 0 else invert_value(D)
+		return X
 
-    return out
+	if gate.gate_type == 'xor':
+		return evaluate_xor(gate)
+	if gate.gate_type == 'xnor':
+		return invert_value(evaluate_xor(gate))
+
+	# For multi-input gates (AND/OR-like with control value gate.c)
+	control = str(gate.c)
+	non_control = '1' if gate.c == 0 else '0'
+
+	# If any input equals control -> output is control
+	if control in in_vals:
+		out = control
+	else:
+		# no control value present
+		if X in in_vals:
+			out = X
+		else:
+			out = non_control
+
+	# Handle D / D' propagation
+	has_d = D in in_vals
+	has_db = DB in in_vals
+	if has_d or has_db:
+		if control in in_vals:
+			out = control
+		else:
+			if has_d and not has_db:
+				out = D
+			elif has_db and not has_d:
+				out = DB
+			else:
+				out = X
+
+	# Account for gate inversion
+	if getattr(gate, 'inv', 0) == 1:
+		out = invert_value(out)
+
+	return out
 
 def get_test_vector():
 	# collect test vector

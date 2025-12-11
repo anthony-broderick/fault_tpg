@@ -1,0 +1,18 @@
+$ Example to test undetectable fault
+$---------------------------------------------------
+$
+
+A                                  	    $... primary input
+B                                    	$... primary input
+
+$
+$
+
+S                                   	$... primary output
+
+
+$
+$
+$       Output  Type    Inputs...
+$       ------  ----    ---------
+        S   	xor    	A   B    

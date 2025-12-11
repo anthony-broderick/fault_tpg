@@ -1,0 +1,23 @@
+$ Example to test undetectable fault
+$---------------------------------------------------
+$
+
+A                                  	    $... primary input
+B                                    	$... primary input
+Cin                                    	$... primary input
+
+$
+$
+
+S                                   	$... primary output
+Cout                                    $... primary output
+
+$
+$
+$       Output  Type    Inputs...
+$       ------  ----    ---------
+        1gat   	xor    	A   B    
+        2gat   	and     A	B
+        S       xor     1gat Cin
+        4gat    and     1gat Cin
+        Cout    or      4gat 2gat

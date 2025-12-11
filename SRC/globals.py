@@ -46,10 +46,10 @@ class Gate:
         if gate_type == "nand" or gate_type == "not":
             self.c = 0
             self.inv = 1
-        elif gate_type == "nor":
+        elif gate_type == "nor" or gate_type == "xnor":
             self.c = 1
             self.inv = 1
-        elif gate_type == "or":
+        elif gate_type == "or" or gate_type == "xor":
             self.c = 1
             self.inv = 0
         elif gate_type == "and":
