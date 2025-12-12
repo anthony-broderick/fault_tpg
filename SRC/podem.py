@@ -7,6 +7,8 @@ ONE = '1'
 D = 'D'
 DB = "D'"
 
+test_line = "A_fan1"
+
 n = -1
 status = "OK"
 
@@ -163,7 +165,7 @@ def Imply(j,vj): # first call is a PI line (j) and needed value (vj)
 def get_initial_output(gate):
     values = []
     has_x = False
-    control = ONE if gate.c == '1' else ZERO
+    control = ONE if gate.c == 1 else ZERO
     gate_type = gate.gate_type
 
     for i in gate.inputs:
@@ -188,7 +190,7 @@ def get_initial_output(gate):
         else:
             values += ["1", "1"]
 
-    # don't cares make it so output is unknown
+    # 'X' make it so output is unknown
     if gate_type not in ["xor", "xnor"]:
         if has_x == True:
             return X

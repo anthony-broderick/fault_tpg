@@ -27,7 +27,7 @@ def invert_value(val):
 def get_initial_output(gate):
 	values = []
 	has_x = False
-	control = ONE if gate.c == '1' else ZERO
+	control = ONE if gate.c == 1 else ZERO
 	gate_type = gate.gate_type
 
 	for i in gate.inputs:
@@ -80,7 +80,7 @@ def get_initial_output(gate):
 					fault_output |= int(values[i])
 				case "xor" | "xnor":
 					fault_output ^= int(values[i])
-
+					
 	# set output
 	if good_output == 0 and fault_output == 0:
 		return ZERO
@@ -94,20 +94,21 @@ def get_initial_output(gate):
 		raise ValueError("Unknown output combination")
 
 def evaluate_gate(gate):
-    # returns new 5-valued logic for gate.output[0] based on gate.inputs
-    in_vals = [globals.wire_values.get(i, X) for i in gate.inputs]
+	# returns new 5-valued logic for gate.output[0] based on gate.inputs
+	in_vals = [globals.wire_values.get(i, X) for i in gate.inputs]
 
-    # NOT gate
-    if gate.gate_type == 'not':
-        return invert_value(in_vals[0])
-    
-    out = get_initial_output(gate)
+	# NOT gate
+	if gate.gate_type == 'not':
+		return invert_value(in_vals[0])
 
-    # account for gate inversion
-    if gate.inv == 1:
-        out = invert_value(out)
+	out = get_initial_output(gate)
+	print(f"{gate.gate_type} with {[globals.wire_values[inp] for inp in gate.inputs]} = {out}")
 
-    return out
+	# account for gate inversion
+	if gate.inv == 1:
+		out = invert_value(out)
+
+	return out
 
 def get_test_vector():
 	# collect test vector
