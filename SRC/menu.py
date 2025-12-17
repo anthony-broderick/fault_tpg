@@ -1,7 +1,7 @@
-from netlist_parser import read_netlist
+from netlist_parsing import read_ckt_netlist, read_v_netlist
 from fault_collapse import collapse_faults
 from podem import PODEM
-from simulate import simulate, get_test_vector
+from simulate import get_test_vector
 import globals
 
 def display_menu():
@@ -17,7 +17,19 @@ def display_menu():
 
 def handle_selection(selection):
     if selection == '0':
-        read_netlist(filepath = input("Enter the path to the net-list file: ").strip())
+        file_type = input("Select netlist type (0 = .ckt, 1 = .v): ").strip()
+
+        match file_type:
+            case '0':
+                filepath = input("Enter the path to the .ckt netlist file: ").strip()
+                read_ckt_netlist(filepath)
+            case '1':
+                filepath = input("Enter the path to the .v netlist file: ").strip()
+                read_v_netlist(filepath)
+            case _:
+                print("Invalid selection. Enter 0.")
+            
+        
     elif selection == '1':
         if not globals.gates:
             print("No gates loaded. Enter netlist with [0] first.")
@@ -36,7 +48,6 @@ def handle_selection(selection):
             print("No gates loaded. Enter netlist with [0] first.")
             return
         get_test_vector()
-        #simulate()
     elif selection == '4':
         if not globals.gates:
             print("No gates loaded. Enter netlist with [0] first.")

@@ -25,7 +25,7 @@ def make_fanouts():
 
     
 
-def read_netlist(filepath: str):
+def read_ckt_netlist(filepath: str):
     # validate file
     # not yet implemented
     if not os.path.isfile(filepath):
@@ -87,4 +87,4 @@ def read_netlist(filepath: str):
 if __name__ == "__main__":
     # Example usage
     filepath = input("Enter the path to the net-list file: ").strip()
-    read_netlist(filepath)
+    read_ckt_netlist(filepath)
